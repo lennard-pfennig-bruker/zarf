@@ -115,6 +115,8 @@ func (c *Cluster) GenerateGitPullCreds(namespace, name string, gitServerInfo typ
 // UpdateZarfManagedImageSecrets updates all Zarf-managed image secrets in all namespaces based on state
 // TODO: Refactor to return errors properly.
 func (c *Cluster) UpdateZarfManagedImageSecrets(ctx context.Context, state *types.ZarfState) {
+	log := logging.FromContextOrDiscard(ctx)
+
 	spinner := message.NewProgressSpinner("Updating existing Zarf-managed image secrets")
 	defer spinner.Stop()
 
@@ -136,13 +138,13 @@ func (c *Cluster) UpdateZarfManagedImageSecrets(ctx context.Context, state *type
 
 				newRegistrySecret, err := c.GenerateRegistryPullCreds(ctx, namespace.Name, config.ZarfImagePullSecretName, state.RegistryInfo)
 				if err != nil {
-					message.WarnErrf(err, "Unable to generate registry creds")
+					log.Warn("unable to generate registry credentials", "error", err)
 					continue
 				}
 				if !maps.EqualFunc(currentRegistrySecret.Data, newRegistrySecret.Data, func(v1, v2 []byte) bool { return bytes.Equal(v1, v2) }) {
 					_, err := c.Clientset.CoreV1().Secrets(newRegistrySecret.Namespace).Update(ctx, newRegistrySecret, metav1.UpdateOptions{})
 					if err != nil {
-						message.WarnErrf(err, "Problem creating registry secret for the %s namespace", namespace.Name)
+						log.Warn("problem creating registry secret for the namespace", "namespace", namespace.Name, "error", err)
 					}
 				}
 			}
